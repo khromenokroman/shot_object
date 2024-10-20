@@ -7,6 +7,7 @@
 
 struct Game {
    private:
+    SDL_Rect m_rec_texture_new_game{0, 0, 0, 0};
     int m_win_width;  // высота окна
     int m_win_height; // ширина окна
     int m_sdl_init;   // статус загрузки SDL
@@ -18,10 +19,11 @@ struct Game {
         m_surface_background_image; // поверхность для заднего фона меню
     std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> m_texture_background_image; // текстура заднего фона меню
     std::unique_ptr<TTF_Font, void (*)(TTF_Font *)> m_ttf_font;                       // шрифт
-    bool is_running{true}; // флаг остановки главного цикла
+    bool m_is_running{true};   // флаг остановки главного цикла
+    bool m_user_choice{false}; // флаг выбора меню пользователем
 
     // рисует задний фон
-    void draw_background() {
+    void draw_background_game() {
         SDL_RenderClear(m_renderer.get());
         SDL_RenderCopy(m_renderer.get(), m_texture_background_image.get(), nullptr, nullptr);
         SDL_RenderPresent(m_renderer.get());
@@ -31,37 +33,19 @@ struct Game {
     void get_os_event(SDL_Event &event) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
-                is_running = false;
+                m_is_running = false;
+            }
+            if (event.type == SDL_MOUSEBUTTONDOWN) {
+                int mouse_x{}, mouse_y{};
+                SDL_GetMouseState(&mouse_x, &mouse_y);
+                SDL_Point mouse_pos{mouse_x, mouse_y};
+                std::cout << "mouse_x: " << mouse_pos.x << " mouse_y: " << mouse_pos.y << '\n';
+                if (SDL_PointInRect(&mouse_pos, &m_rec_texture_new_game)) {
+                    m_user_choice = true;
+                }
+                std::cout << "m_user_choice: " << m_user_choice << '\n';
             }
         }
-    }
-
-    // Показывает начальный экран
-    void show_menu() {
-        std::string new_game{"New game"}, records{"Records"}, exit{"Exit"};
-        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_new_game{
-            TTF_RenderText_Blended(m_ttf_font.get(), new_game.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
-        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_records{
-            TTF_RenderText_Blended(m_ttf_font.get(), records.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
-        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_exit{
-            TTF_RenderText_Blended(m_ttf_font.get(), exit.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
-
-        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_new_game{
-            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_new_game.get()), SDL_DestroyTexture};
-        SDL_Rect rec_texture_new_game{10, 100, surface_text_new_game->w, surface_text_new_game->h};
-        SDL_RenderCopy(m_renderer.get(), texture_new_game.get(), nullptr, &rec_texture_new_game);
-        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_records{
-            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_records.get()), SDL_DestroyTexture};
-        SDL_Rect rec_texture_records{10, 100 + surface_text_new_game->h, surface_text_records->w,
-                                     surface_text_records->h};
-        SDL_RenderCopy(m_renderer.get(), texture_records.get(), nullptr, &rec_texture_records);
-        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_exit{
-            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_exit.get()), SDL_DestroyTexture};
-        SDL_Rect rec_texture_exit{10, 100 + surface_text_new_game->h + surface_text_records->h, surface_text_exit->w,
-                                  surface_text_exit->h};
-        SDL_RenderCopy(m_renderer.get(), texture_exit.get(), nullptr, &rec_texture_exit);
-
-        SDL_RenderPresent(m_renderer.get());
     }
 
    public:
@@ -106,14 +90,50 @@ struct Game {
         SDL_Quit();
     }
 
+    // Показывает начальный экран
+    void show_menu() {
+        SDL_RenderClear(m_renderer.get());
+        SDL_RenderCopy(m_renderer.get(), m_texture_background_image.get(), nullptr, nullptr);
+
+        std::string new_game{"New game"}, records{"Records"}, exit{"Exit"};
+
+        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_new_game{
+            TTF_RenderText_Blended(m_ttf_font.get(), new_game.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
+        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_records{
+            TTF_RenderText_Blended(m_ttf_font.get(), records.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
+        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_exit{
+            TTF_RenderText_Blended(m_ttf_font.get(), exit.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
+
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_new_game{
+            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_new_game.get()), SDL_DestroyTexture};
+        m_rec_texture_new_game = {10, 100, surface_text_new_game->w, surface_text_new_game->h};
+        SDL_RenderCopy(m_renderer.get(), texture_new_game.get(), nullptr, &m_rec_texture_new_game);
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_records{
+            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_records.get()), SDL_DestroyTexture};
+        SDL_Rect rec_texture_records{10, 100 + surface_text_new_game->h, surface_text_records->w,
+                                     surface_text_records->h};
+        SDL_RenderCopy(m_renderer.get(), texture_records.get(), nullptr, &rec_texture_records);
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_exit{
+            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_exit.get()), SDL_DestroyTexture};
+        SDL_Rect rec_texture_exit{10, 100 + surface_text_new_game->h + surface_text_records->h, surface_text_exit->w,
+                                  surface_text_exit->h};
+        SDL_RenderCopy(m_renderer.get(), texture_exit.get(), nullptr, &rec_texture_exit);
+
+        SDL_RenderPresent(m_renderer.get());
+
+        SDL_Event event;
+        while (m_is_running && !m_user_choice) {
+            get_os_event(event);
+            SDL_Delay(500);
+        }
+    }
+
     // основной цикл программы
     void run() {
+        std::cout << "Start main loop game" << '\n';
         SDL_Event event;
-        while (is_running) {
-            draw_background();
+        while (m_is_running) {
             get_os_event(event);
-            show_menu();
-
             SDL_Delay(100);
         }
     }

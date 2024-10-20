@@ -14,6 +14,7 @@ int main() {
     } catch (std::exception const &ex) {
         std::cout << "Error: " << ex.what() << std::endl;
     }
+    game->show_menu();
     game->run();
 
     return 0;
