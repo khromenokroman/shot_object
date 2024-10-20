@@ -8,19 +8,22 @@
 struct Game {
    private:
     SDL_Rect m_rec_texture_new_game{0, 0, 0, 0};
-    int m_win_width;  // высота окна
-    int m_win_height; // ширина окна
-    int m_sdl_init;   // статус загрузки SDL
-    int m_img_init;   // статус загрузки подсистемы изображений
-    int m_ttf_init;   // статус загрузки подсистемы шрифтов
+    int m_win_width;                                                    // высота окна
+    int m_win_height;                                                   // ширина окна
+    int m_sdl_init;                                                     // статус загрузки SDL
+    int m_img_init;                                                     // статус загрузки подсистемы изображений
+    int m_ttf_init;                                                     // статус загрузки подсистемы шрифтов
     std::unique_ptr<SDL_Window, void (*)(SDL_Window *)> m_window;       // окно
     std::unique_ptr<SDL_Renderer, void (*)(SDL_Renderer *)> m_renderer; // рисовальщик
-    std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)>
-        m_surface_background_image; // поверхность для заднего фона меню
+    std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> m_surface_background_image; // поверхность для заднего фона меню
     std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> m_texture_background_image; // текстура заднего фона меню
-    std::unique_ptr<TTF_Font, void (*)(TTF_Font *)> m_ttf_font;                       // шрифт
-    bool m_is_running{true};   // флаг остановки главного цикла
-    bool m_user_choice{false}; // флаг выбора меню пользователем
+    std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> m_surface_background_game; // поверхность для заднего фона игры
+    std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> m_texture_background_game; // текстура для заднего фона игры
+    std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> m_surface_player_image;    // поверхность для пользователя
+    std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> m_texture_player_image;    // текстура для пользователя
+    std::unique_ptr<TTF_Font, void (*)(TTF_Font *)> m_ttf_font;                      // шрифт
+    bool m_is_running{true};                                                         // флаг остановки главного цикла
+    bool m_user_choice{false};                                                       // флаг выбора меню пользователем
 
     // рисует задний фон
     void draw_background_game() {}
@@ -51,22 +54,31 @@ struct Game {
           m_sdl_init{SDL_Init(SDL_INIT_VIDEO)},
           m_img_init{IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG)},
           m_ttf_init{TTF_Init()},
-          m_window{SDL_CreateWindow("test_window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_win_width,
-                                    m_win_height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE),
+          m_window{SDL_CreateWindow("test_window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_win_width, m_win_height,
+                                    SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE),
                    SDL_DestroyWindow},
           m_renderer{SDL_CreateRenderer(m_window.get(), -1, SDL_RENDERER_ACCELERATED), SDL_DestroyRenderer},
           m_surface_background_image{IMG_Load("../images/start_menu.jpg"), SDL_FreeSurface},
-          m_texture_background_image{SDL_CreateTextureFromSurface(m_renderer.get(), m_surface_background_image.get()),
-                                     SDL_DestroyTexture},
+          m_texture_background_image{SDL_CreateTextureFromSurface(m_renderer.get(), m_surface_background_image.get()), SDL_DestroyTexture},
+          m_surface_background_game{IMG_Load("../images/background_game.jpg"), SDL_FreeSurface},
+          m_texture_background_game{SDL_CreateTextureFromSurface(m_renderer.get(), m_surface_background_game.get()), SDL_DestroyTexture},
+          m_surface_player_image{IMG_Load("../images/player.png"), SDL_FreeSurface},
+          m_texture_player_image{SDL_CreateTextureFromSurface(m_renderer.get(), m_surface_player_image.get()), SDL_DestroyTexture},
           m_ttf_font{TTF_OpenFont("../fonts/DejaVuSans.ttf", 25), TTF_CloseFont} {
         if (m_sdl_init != 0) {
             throw std::runtime_error("Error while init video system: " + std::string(SDL_GetError()));
+        }
+        if (!m_surface_background_game) {
+            throw std::runtime_error("Error while load image background_game.jpg: " + std::string(SDL_GetError()));
+        }
+        if (!m_surface_player_image) {
+            throw std::runtime_error("Error while load image player.png: " + std::string(SDL_GetError()));
         }
         if (m_img_init == 0) {
             throw std::runtime_error("Error while init image system: " + std::string(SDL_GetError()));
         }
         if (!m_surface_background_image) {
-            throw std::runtime_error("Error while load background image: " + std::string(SDL_GetError()));
+            throw std::runtime_error("Error while load image start_menu.jpg: " + std::string(SDL_GetError()));
         }
         if (m_ttf_init) {
             throw std::runtime_error("Error while init ttf system: " + std::string(SDL_GetError()));
@@ -106,13 +118,11 @@ struct Game {
         SDL_RenderCopy(m_renderer.get(), texture_new_game.get(), nullptr, &m_rec_texture_new_game);
         std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_records{
             SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_records.get()), SDL_DestroyTexture};
-        SDL_Rect rec_texture_records{10, 100 + surface_text_new_game->h, surface_text_records->w,
-                                     surface_text_records->h};
+        SDL_Rect rec_texture_records{10, 100 + surface_text_new_game->h, surface_text_records->w, surface_text_records->h};
         SDL_RenderCopy(m_renderer.get(), texture_records.get(), nullptr, &rec_texture_records);
-        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_exit{
-            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_exit.get()), SDL_DestroyTexture};
-        SDL_Rect rec_texture_exit{10, 100 + surface_text_new_game->h + surface_text_records->h, surface_text_exit->w,
-                                  surface_text_exit->h};
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_exit{SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_exit.get()),
+                                                                           SDL_DestroyTexture};
+        SDL_Rect rec_texture_exit{10, 100 + surface_text_new_game->h + surface_text_records->h, surface_text_exit->w, surface_text_exit->h};
         SDL_RenderCopy(m_renderer.get(), texture_exit.get(), nullptr, &rec_texture_exit);
 
         SDL_RenderPresent(m_renderer.get());
@@ -128,38 +138,24 @@ struct Game {
     void run() {
         std::cout << "Start main loop game" << '\n';
         SDL_RenderClear(m_renderer.get());
-        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_background_image_game{
-            IMG_Load("../images/background_game.jpg"), SDL_FreeSurface};
-        if (!surface_background_image_game) {
-            throw std::runtime_error("Error while load background image game: " + std::string(SDL_GetError()));
-        }
-        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_background_image{
-            SDL_CreateTextureFromSurface(m_renderer.get(), surface_background_image_game.get()), SDL_DestroyTexture};
 
-        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_player_image{IMG_Load("../images/player.png"),
-                                                                                   SDL_FreeSurface};
-        if (!surface_player_image) {
-            throw std::runtime_error("Error while load background image game: " + std::string(SDL_GetError()));
-        }
-        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_player_image{
-            SDL_CreateTextureFromSurface(m_renderer.get(), surface_player_image.get()), SDL_DestroyTexture};
-        SDL_Rect player_rect{0, 0, 220, surface_player_image->h / 2};
+        SDL_Rect player_rect{0, 0, 220, m_surface_player_image->h / 2};
         SDL_Rect dst_player{100, m_win_height - 250, player_rect.w, player_rect.h};
 
         int frame = 0;
         int frame_count = 5;
         int cur_frame_time = 0;
         int max_frame_time = 200;
-        int last_time = SDL_GetTicks();
+        int last_time = static_cast<int>(SDL_GetTicks());
         int new_time = 0;
         int dt = 0;
 
         SDL_Event event;
         while (m_is_running) {
             SDL_RenderClear(m_renderer.get());
-            SDL_RenderCopy(m_renderer.get(), texture_background_image.get(), nullptr, nullptr);
+            SDL_RenderCopy(m_renderer.get(), m_texture_background_game.get(), nullptr, nullptr);
             get_os_event(event);
-            new_time = SDL_GetTicks();
+            new_time = static_cast<int>(SDL_GetTicks());
             dt = new_time - last_time;
             last_time = new_time;
             cur_frame_time += dt;
@@ -168,7 +164,7 @@ struct Game {
                 frame = (frame + 1) % frame_count;
                 player_rect.x = player_rect.w * frame;
             }
-            SDL_RenderCopy(m_renderer.get(), texture_player_image.get(), &player_rect, &dst_player);
+            SDL_RenderCopy(m_renderer.get(), m_texture_player_image.get(), &player_rect, &dst_player);
             SDL_RenderPresent(m_renderer.get());
             SDL_Delay(100);
         }
