@@ -11,11 +11,11 @@ int main() {
     std::unique_ptr<Game> game;
     try {
         game = std::make_unique<Game>(START_WINDOW_WIDTH, START_WINDOW_HEIGHT);
+        game->show_menu();
+        game->run();
     } catch (std::exception const &ex) {
         std::cout << "Error: " << ex.what() << std::endl;
     }
-    game->show_menu();
-    game->run();
 
     return 0;
 }

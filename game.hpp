@@ -24,9 +24,7 @@ struct Game {
 
     // рисует задний фон
     void draw_background_game() {
-        SDL_RenderClear(m_renderer.get());
-        SDL_RenderCopy(m_renderer.get(), m_texture_background_image.get(), nullptr, nullptr);
-        SDL_RenderPresent(m_renderer.get());
+
     }
 
     // получает события системы
@@ -131,6 +129,17 @@ struct Game {
     // основной цикл программы
     void run() {
         std::cout << "Start main loop game" << '\n';
+        SDL_RenderClear(m_renderer.get());
+        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_background_image_game{
+            IMG_Load("../images/background_game.jpg"), SDL_FreeSurface};
+        if (!surface_background_image_game) {
+            throw std::runtime_error("Error while load background image game: " + std::string(SDL_GetError()));
+        }
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_background_image{
+            SDL_CreateTextureFromSurface(m_renderer.get(), surface_background_image_game.get()), SDL_DestroyTexture};
+        SDL_RenderCopy(m_renderer.get(), texture_background_image.get(), nullptr, nullptr);
+        SDL_RenderPresent(m_renderer.get());
+
         SDL_Event event;
         while (m_is_running) {
             get_os_event(event);
