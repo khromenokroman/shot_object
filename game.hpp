@@ -1,17 +1,19 @@
 #pragma once
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL_ttf.h>
 
 #include <memory>
 
 struct Game {
    private:
-    SDL_Rect m_rec_texture_new_game{0, 0, 0, 0};
+    SDL_Rect m_rec_texture_new_game{0, 0, 0, 0};                        // Область для текста новая игра
     int m_win_width;                                                    // высота окна
     int m_win_height;                                                   // ширина окна
     int m_sdl_init;                                                     // статус загрузки SDL
     int m_img_init;                                                     // статус загрузки подсистемы изображений
+    int m_mix_init;                                                     // статус загрузки подсистемы музыки
     int m_ttf_init;                                                     // статус загрузки подсистемы шрифтов
     std::unique_ptr<SDL_Window, void (*)(SDL_Window *)> m_window;       // окно
     std::unique_ptr<SDL_Renderer, void (*)(SDL_Renderer *)> m_renderer; // рисовальщик
@@ -22,8 +24,9 @@ struct Game {
     std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> m_surface_player_image;    // поверхность для пользователя
     std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> m_texture_player_image;    // текстура для пользователя
     std::unique_ptr<TTF_Font, void (*)(TTF_Font *)> m_ttf_font;                      // шрифт
-    bool m_is_running{true};                                                         // флаг остановки главного цикла
-    bool m_user_choice{false};                                                       // флаг выбора меню пользователем
+    Mix_Music *backgroundMusic = nullptr;
+    bool m_is_running{true};   // флаг остановки главного цикла
+    bool m_user_choice{false}; // флаг выбора меню пользователем
 
     // рисует задний фон
     void draw_background_game() {}
@@ -53,6 +56,7 @@ struct Game {
           m_win_width{win_width},
           m_sdl_init{SDL_Init(SDL_INIT_VIDEO)},
           m_img_init{IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG)},
+          m_mix_init{Mix_Init(MIX_INIT_MP3)},
           m_ttf_init{TTF_Init()},
           m_window{SDL_CreateWindow("test_window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_win_width, m_win_height,
                                     SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE),
@@ -80,6 +84,9 @@ struct Game {
         if (!m_surface_background_image) {
             throw std::runtime_error("Error while load image start_menu.jpg: " + std::string(SDL_GetError()));
         }
+        if (m_mix_init == 0) {
+            throw std::runtime_error("Error while init mix system: " + std::string(SDL_GetError()));
+        }
         if (m_ttf_init) {
             throw std::runtime_error("Error while init ttf system: " + std::string(SDL_GetError()));
         }
@@ -91,15 +98,20 @@ struct Game {
         if (!m_renderer) {
             throw std::runtime_error("Error while create renderer: " + std::string(SDL_GetError()));
         }
+        Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
+        backgroundMusic = Mix_LoadMUS("../sounds/main.mp3");
     }
     ~Game() {
+        Mix_FreeMusic(backgroundMusic);
         TTF_Quit();
+        Mix_Quit();
         IMG_Quit();
         SDL_Quit();
     }
 
     // Показывает начальный экран
     void show_menu() {
+        Mix_PlayMusic(backgroundMusic, -1);
         SDL_RenderClear(m_renderer.get());
         SDL_RenderCopy(m_renderer.get(), m_texture_background_image.get(), nullptr, nullptr);
 
