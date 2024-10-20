@@ -1,21 +1,29 @@
 #pragma once
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 
 #include <memory>
 
 struct Game {
    private:
-    int m_win_width;
-    int m_win_height;
-    int m_init;
-    std::unique_ptr<SDL_Window, void (*)(SDL_Window *)> m_window;
-    std::unique_ptr<SDL_Renderer, void (*)(SDL_Renderer *)> m_renderer;
-    bool is_running{true};
+    int m_win_width;  // высота окна
+    int m_win_height; // ширина окна
+    int m_sdl_init;   // статус загрузки SDL
+    int m_img_init;   // статус загрузки подсистемы изображений
+    int m_ttf_init;   // статус загрузки подсистемы шрифтов
+    std::unique_ptr<SDL_Window, void (*)(SDL_Window *)> m_window;       // окно
+    std::unique_ptr<SDL_Renderer, void (*)(SDL_Renderer *)> m_renderer; // рисовальщик
+    std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)>
+        m_surface_background_image; // поверхность для заднего фона меню
+    std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> m_texture_background_image; // текстура заднего фона меню
+    std::unique_ptr<TTF_Font, void (*)(TTF_Font *)> m_ttf_font;                       // шрифт
+    bool is_running{true}; // флаг остановки главного цикла
 
     // рисует задний фон
     void draw_background() {
-        SDL_SetRenderDrawColor(m_renderer.get(), 190, 189, 191, 255);
         SDL_RenderClear(m_renderer.get());
+        SDL_RenderCopy(m_renderer.get(), m_texture_background_image.get(), nullptr, nullptr);
         SDL_RenderPresent(m_renderer.get());
     }
 
@@ -28,17 +36,60 @@ struct Game {
         }
     }
 
+    // Показывает начальный экран
+    void show_menu() {
+        std::string new_game{"New game"}, records{"Records"}, exit{"Exit"};
+        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_new_game{
+            TTF_RenderText_Blended(m_ttf_font.get(), new_game.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
+        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_records{
+            TTF_RenderText_Blended(m_ttf_font.get(), records.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
+        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_text_exit{
+            TTF_RenderText_Blended(m_ttf_font.get(), exit.c_str(), {180, 0, 0, 255}), SDL_FreeSurface};
+
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_new_game{
+            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_new_game.get()), SDL_DestroyTexture};
+        SDL_Rect rec_texture_new_game{10, 100, surface_text_new_game->w, surface_text_new_game->h};
+        SDL_RenderCopy(m_renderer.get(), texture_new_game.get(), nullptr, &rec_texture_new_game);
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_records{
+            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_records.get()), SDL_DestroyTexture};
+        SDL_Rect rec_texture_records{10, 100 + surface_text_new_game->h, surface_text_records->w,
+                                     surface_text_records->h};
+        SDL_RenderCopy(m_renderer.get(), texture_records.get(), nullptr, &rec_texture_records);
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_exit{
+            SDL_CreateTextureFromSurface(m_renderer.get(), surface_text_exit.get()), SDL_DestroyTexture};
+        SDL_Rect rec_texture_exit{10, 100 + surface_text_new_game->h + surface_text_records->h, surface_text_exit->w,
+                                  surface_text_exit->h};
+        SDL_RenderCopy(m_renderer.get(), texture_exit.get(), nullptr, &rec_texture_exit);
+
+        SDL_RenderPresent(m_renderer.get());
+    }
+
    public:
     Game(int win_width, int win_height)
         : m_win_height{win_height},
           m_win_width{win_width},
-          m_init{SDL_Init(SDL_INIT_VIDEO)},
+          m_sdl_init{SDL_Init(SDL_INIT_VIDEO)},
+          m_img_init{IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG)},
+          m_ttf_init{TTF_Init()},
           m_window{SDL_CreateWindow("test_window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_win_width,
                                     m_win_height, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE),
                    SDL_DestroyWindow},
-          m_renderer{SDL_CreateRenderer(m_window.get(), -1, SDL_RENDERER_ACCELERATED), SDL_DestroyRenderer} {
-        if (m_init != 0) {
+          m_renderer{SDL_CreateRenderer(m_window.get(), -1, SDL_RENDERER_ACCELERATED), SDL_DestroyRenderer},
+          m_surface_background_image{IMG_Load("../images/start_menu.jpg"), SDL_FreeSurface},
+          m_texture_background_image{SDL_CreateTextureFromSurface(m_renderer.get(), m_surface_background_image.get()),
+                                     SDL_DestroyTexture},
+          m_ttf_font{TTF_OpenFont("../fonts/DejaVuSans.ttf", 25), TTF_CloseFont} {
+        if (m_sdl_init != 0) {
             throw std::runtime_error("Error while init video system: " + std::string(SDL_GetError()));
+        }
+        if (m_img_init == 0) {
+            throw std::runtime_error("Error while init image system: " + std::string(SDL_GetError()));
+        }
+        if (!m_surface_background_image) {
+            throw std::runtime_error("Error while load background image: " + std::string(SDL_GetError()));
+        }
+        if (m_ttf_init) {
+            throw std::runtime_error("Error while init ttf system: " + std::string(SDL_GetError()));
         }
 
         if (!m_window) {
@@ -49,7 +100,11 @@ struct Game {
             throw std::runtime_error("Error while create renderer: " + std::string(SDL_GetError()));
         }
     }
-    ~Game() { SDL_Quit(); }
+    ~Game() {
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+    }
 
     // основной цикл программы
     void run() {
@@ -57,6 +112,9 @@ struct Game {
         while (is_running) {
             draw_background();
             get_os_event(event);
+            show_menu();
+
+            SDL_Delay(100);
         }
     }
 };
