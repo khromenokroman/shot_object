@@ -23,9 +23,7 @@ struct Game {
     bool m_user_choice{false}; // флаг выбора меню пользователем
 
     // рисует задний фон
-    void draw_background_game() {
-
-    }
+    void draw_background_game() {}
 
     // получает события системы
     void get_os_event(SDL_Event &event) {
@@ -137,12 +135,41 @@ struct Game {
         }
         std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_background_image{
             SDL_CreateTextureFromSurface(m_renderer.get(), surface_background_image_game.get()), SDL_DestroyTexture};
-        SDL_RenderCopy(m_renderer.get(), texture_background_image.get(), nullptr, nullptr);
-        SDL_RenderPresent(m_renderer.get());
+
+        std::unique_ptr<SDL_Surface, void (*)(SDL_Surface *)> surface_player_image{IMG_Load("../images/player.png"),
+                                                                                   SDL_FreeSurface};
+        if (!surface_player_image) {
+            throw std::runtime_error("Error while load background image game: " + std::string(SDL_GetError()));
+        }
+        std::unique_ptr<SDL_Texture, void (*)(SDL_Texture *)> texture_player_image{
+            SDL_CreateTextureFromSurface(m_renderer.get(), surface_player_image.get()), SDL_DestroyTexture};
+        SDL_Rect player_rect{0, 0, 220, surface_player_image->h / 2};
+        SDL_Rect dst_player{100, m_win_height - 250, player_rect.w, player_rect.h};
+
+        int frame = 0;
+        int frame_count = 5;
+        int cur_frame_time = 0;
+        int max_frame_time = 200;
+        int last_time = SDL_GetTicks();
+        int new_time = 0;
+        int dt = 0;
 
         SDL_Event event;
         while (m_is_running) {
+            SDL_RenderClear(m_renderer.get());
+            SDL_RenderCopy(m_renderer.get(), texture_background_image.get(), nullptr, nullptr);
             get_os_event(event);
+            new_time = SDL_GetTicks();
+            dt = new_time - last_time;
+            last_time = new_time;
+            cur_frame_time += dt;
+            if (cur_frame_time >= max_frame_time) {
+                cur_frame_time -= max_frame_time;
+                frame = (frame + 1) % frame_count;
+                player_rect.x = player_rect.w * frame;
+            }
+            SDL_RenderCopy(m_renderer.get(), texture_player_image.get(), &player_rect, &dst_player);
+            SDL_RenderPresent(m_renderer.get());
             SDL_Delay(100);
         }
     }
